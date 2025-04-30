@@ -184,3 +184,16 @@ class ErpService {
 
 // Singleton instance oluştur ve export et
 export const erpService = new ErpService();
+
+/**
+ * ERP Service composable fonksiyonu - ai-service.js için gerekli
+ * @returns {Object} ERP Service instance
+ */
+export const useErpService = () => {
+  // Eğer başlatılmamışsa başlat
+  if (!erpService.initialized) {
+    erpService.init();
+  }
+  
+  return erpService;
+};

@@ -194,6 +194,140 @@ const addStockMovement = async (movementData) => {
   }
 };
 
+/**
+ * Sipariş için malzemeleri getir
+ * @param {string} orderId - Sipariş ID'si
+ * @returns {Promise<Array>} Malzemeler dizisi
+ */
+const getMaterialsForOrder = async (orderId) => {
+  try {
+    return await queryDocuments(
+      'materials',
+      { orderId },
+      { field: 'name', direction: 'asc' }
+    );
+  } catch (error) {
+    console.error(`Sipariş malzemeleri getirme hatası (${orderId}):`, error);
+    throw error;
+  }
+};
+
+/**
+ * Kritik stok seviyesindeki malzemeleri getir
+ * @returns {Promise<Array>} Kritik malzemeler dizisi
+ */
+const getCriticalMaterials = async () => {
+  try {
+    // Stok durumunu kontrol et ve kritik olanları filtrele
+    const allMaterials = await queryDocuments('materials');
+    
+    return allMaterials.filter(material => {
+      return material.minLevel && material.quantity && material.quantity <= material.minLevel;
+    });
+  } catch (error) {
+    console.error("Kritik malzemeleri getirme hatası:", error);
+    throw error;
+  }
+};
+
+/**
+ * Stok özeti getir
+ * @returns {Promise<Object>} Stok özeti
+ */
+const getStockSummary = async () => {
+  try {
+    const allMaterials = await queryDocuments('materials');
+    const stockMovements = await queryDocuments(
+      'stockMovements',
+      {},
+      { field: 'timestamp', direction: 'desc' },
+      10
+    );
+    
+    // Kritik seviyedeki malzemeleri say
+    const criticalCount = allMaterials.filter(material => 
+      material.minLevel && material.quantity && material.quantity <= material.minLevel
+    ).length;
+    
+    // Siparişlere ayrılan malzemeleri say
+    const reservedCount = allMaterials.filter(material => material.reserved).length;
+    
+    // Toplam stok değeri
+    const stockValue = allMaterials.reduce((total, material) => {
+      return total + (material.quantity || 0) * (material.unitPrice || 0);
+    }, 0);
+    
+    // Son değişenler
+    const recentlyChanged = stockMovements.map(movement => {
+      const material = allMaterials.find(m => m.id === movement.materialId);
+      return {
+        id: movement.materialId,
+        code: material ? material.code : movement.materialId,
+        name: material ? material.name : 'Bilinmeyen Malzeme',
+        change: movement.type === 'in' ? movement.quantity : -movement.quantity,
+        date: movement.timestamp ? new Date(movement.timestamp) : new Date()
+      };
+    });
+    
+    return {
+      totalMaterials: allMaterials.length,
+      criticalCount,
+      reservedCount,
+      stockValue,
+      recentlyChanged
+    };
+  } catch (error) {
+    console.error("Stok özeti getirme hatası:", error);
+    throw error;
+  }
+};
+
+/**
+ * Malzeme bilgisini kodu ile getir
+ * @param {string} code - Malzeme kodu
+ * @returns {Promise<Object|null>} Malzeme bilgisi
+ */
+const getMaterialByCode = async (code) => {
+  try {
+    const materials = await queryDocuments(
+      'materials',
+      { code },
+      {},
+      1
+    );
+    
+    if (materials && materials.length > 0) {
+      return materials[0];
+    }
+    
+    return null;
+  } catch (error) {
+    console.error(`Malzeme bilgisi getirme hatası (${code}):`, error);
+    throw error;
+  }
+};
+
+/**
+ * Material Service composable fonksiyonu - ai-service.js için gerekli
+ * @returns {Object} Material service fonksiyonları
+ */
+const useMaterialService = () => {
+  return {
+    getMaterials,
+    getMaterial,
+    addMaterial,
+    updateMaterial,
+    deleteMaterial,
+    addOrderMaterials,
+    getInStockMaterials,
+    addStockMovement,
+    getMaterialsForOrder,
+    getCriticalMaterials,
+    getStockSummary,
+    getMaterialByCode
+  };
+};
+
 export {
   getMaterials,
   getMaterial,
@@ -202,5 +336,10 @@ export {
   deleteMaterial,
   addOrderMaterials,
   getInStockMaterials,
-  addStockMovement
+  addStockMovement,
+  getMaterialsForOrder,
+  getCriticalMaterials,
+  getStockSummary,
+  getMaterialByCode,
+  useMaterialService
 };
