@@ -888,6 +888,504 @@ const createStockSummaryResponse = (summary) => {
   };
 };
 
+/**
+ * Bildirimleri temizler
+ */
+const clearSuggestions = () => {
+  hasNewSuggestion.value = false;
+};
+
+/**
+ * AI modunu değiştirir
+ * @param {string} mode - Yeni mod
+ */
+const setMode = (mode) => {
+  if (aiModes.some(m => m.id === mode)) {
+    currentMode.value = mode;
+    if (technicalStore) {
+      technicalStore.setAIStatus({ mode });
+    }
+  }
+};
+
+/**
+ * AI dilini değiştirir
+ * @param {string} lang - Yeni dil
+ */
+const setLanguage = (lang) => {
+  if (supportedLanguages.value.includes(lang)) {
+    currentLanguage.value = lang;
+  }
+};
+
+/**
+ * Chat geçmişini temizler
+ */
+const clearChatHistory = () => {
+  chatHistory.value = [];
+};
+
+/**
+ * Öğrenme modunu değiştirir
+ * @param {boolean} enabled - Öğrenme modu durumu
+ */
+const setLearningMode = (enabled) => {
+  learningMode.value = enabled;
+};
+
+/**
+ * Rapor oluşturur
+ * @param {string} reportType - Rapor tipi
+ * @param {object} params - Rapor parametreleri
+ * @returns {Promise<object>} Rapor
+ */
+const generateReport = async (reportType, params = {}) => {
+  if (!isConnected.value) {
+    await initializeAI();
+  }
+  
+  // TODO: Rapor oluşturma mantığını ekle
+  return {
+    type: reportType,
+    timestamp: new Date(),
+    content: `${reportType} raporu oluşturuldu`,
+    data: {}
+  };
+};
+
+/**
+ * AI'yi belirli bir veriyle eğitir
+ * @param {string} dataType - Veri tipi
+ * @param {object} data - Eğitim verisi
+ * @returns {Promise<boolean>} Başarı durumu
+ */
+const trainAI = async (dataType, data = {}) => {
+  if (!isConnected.value) {
+    await initializeAI();
+  }
+  
+  // TODO: Eğitim mantığını ekle
+  return true;
+};
+
+/**
+ * Öğrenme modu durumunu getirir
+ * @returns {boolean} Öğrenme modu durumu
+ */
+const getLearningMode = () => {
+  return learningMode.value;
+};
+
+/**
+ * Mevcut modu getirir
+ * @returns {string} Mevcut mod
+ */
+const getCurrentMode = () => {
+  return currentMode.value;
+};
+
+/**
+ * Kullanılabilir modları getirir
+ * @returns {Array} Mod listesi
+ */
+const getModes = () => {
+  return aiModes;
+};
+
+/**
+ * Chat geçmişini getirir
+ * @returns {Array} Chat geçmişi
+ */
+const getChatHistory = () => {
+  return chatHistory.value;
+};
+
+/**
+ * Herhangi bir mesaj için genel yanıt oluşturur
+ * @private
+ * @param {string} message - Kullanıcı mesajı
+ * @param {object} context - Ek bağlam bilgileri
+ * @returns {object} AI yanıtı
+ */
+const generateAIResponse = (message, context = {}) => {
+  // Basit cevaplar - ileriki aşamalarda LLM API entegrasyonu ile değiştirilebilir
+  const lowercaseMsg = message.toLowerCase();
+  
+  if (lowercaseMsg.includes('merhaba') || lowercaseMsg.includes('selam')) {
+    return {
+      text: 'Merhaba! Size nasıl yardımcı olabilirim?',
+      timestamp: new Date(),
+      suggestions: [
+        'Günlük üretim durumu nedir?',
+        'Kritik stok seviyesindeki malzemeler',
+        'Geciken siparişleri listele'
+      ]
+    };
+  }
+  
+  if (lowercaseMsg.includes('yardım') || lowercaseMsg === 'help') {
+    return {
+      text: 'Size nasıl yardımcı olabilirim? Siparişler, stok durumu, üretim planlaması veya raporlar hakkında bilgi almak için soru sorabilirsiniz.',
+      timestamp: new Date(),
+      suggestions: [
+        'Bir sipariş sorgula',
+        'Stok durumunu göster',
+        'Günlük üretim planı',
+        'Analiz raporu oluştur'
+      ]
+    };
+  }
+  
+  if (lowercaseMsg.includes('teşekkür')) {
+    return {
+      text: 'Rica ederim! Başka bir sorunuz olursa yardımcı olmaktan memnuniyet duyarım.',
+      timestamp: new Date(),
+      suggestions: [
+        'Günlük özeti göster',
+        'Yeni sipariş oluştur'
+      ]
+    };
+  }
+  
+  // Özel bilgi/bilişim talebi
+  if (lowercaseMsg.includes('rapor') || lowercaseMsg.includes('analiz')) {
+    return {
+      text: 'Ne tür bir rapor veya analiz oluşturmamı istersiniz? Günlük, haftalık, aylık üretim raporları, stok analizleri veya sipariş performans analizleri oluşturabilirim.',
+      timestamp: new Date(),
+      suggestions: [
+        'Aylık üretim özeti',
+        'Stok tüketim analizi',
+        'Sipariş gecikme nedenleri',
+        'Verimlilik raporu'
+      ]
+    };
+  }
+  
+  // Genel sorulara cevap
+  return {
+    text: 'Bu konuda daha detaylı bilgi toplayabilirim. Lütfen siparişler, üretim planlaması, stok durumu veya teknik detaylar hakkında daha spesifik sorular sorunuz.',
+    timestamp: new Date(),
+    suggestions: [
+      'Günlük üretim durumu',
+      'Kritik stok seviyesindeki malzemeler',
+      'Sipariş durumu sorgula',
+      'Üretim verimliliği analizi'
+    ]
+  };
+};
+
+/**
+ * Belirli bir malzeme hakkında bilgi getirir
+ * @param {string} materialCode - Malzeme kodu
+ * @returns {Promise<object>} Malzeme bilgisi
+ */
+const getMaterialInfo = async (materialCode) => {
+  try {
+    if (materialService) {
+      const material = await materialService.getMaterialByCode(materialCode);
+      return material;
+    }
+    
+    // Mock veri
+    const mockMaterials = {
+      'M-1001': {
+        id: 'M-1001',
+        code: 'M-1001',
+        name: 'Filtre Elemanı A4',
+        category: 'Filtre',
+        currentStock: 2,
+        minLevel: 5,
+        location: 'B01-R05-S02',
+        unitPrice: 450,
+        supplier: 'ABC Filter Ltd.',
+        leadTime: '10 gün'
+      },
+      'K-2203': {
+        id: 'K-2203',
+        code: 'K-2203',
+        name: 'Conta Takımı',
+        category: 'Conta',
+        currentStock: 0,
+        minLevel: 10,
+        location: 'B01-R08-S12',
+        unitPrice: 120,
+        supplier: 'XYZ Conta San. A.Ş.',
+        leadTime: '5 gün'
+      }
+    };
+    
+    return mockMaterials[materialCode] || null;
+  } catch (error) {
+    logger.error(`Malzeme bilgisi alınırken hata (${materialCode}):`, error);
+    return null;
+  }
+};
+
+/**
+ * Malzeme detay yanıtı oluşturur
+ * @param {object} material - Malzeme bilgisi
+ * @returns {object} Oluşturulan yanıt
+ */
+const createMaterialDetailResponse = (material) => {
+  if (!material) {
+    return {
+      text: 'Malzeme bilgisi bulunamadı.',
+      timestamp: new Date(),
+      suggestions: [
+        'Tüm stok durumunu göster',
+        'Kritik malzemeleri göster'
+      ]
+    };
+  }
+  
+  let responseText = `${material.name} (${material.code}) detayları:\n`;
+  responseText += `Kategori: ${material.category || 'Belirtilmemiş'}\n`;
+  responseText += `Mevcut stok: ${material.currentStock} adet\n`;
+  responseText += `Minimum stok seviyesi: ${material.minLevel} adet\n`;
+  responseText += `Lokasyon: ${material.location || 'Belirtilmemiş'}\n`;
+  
+  if (material.supplier) {
+    responseText += `Tedarikçi: ${material.supplier}\n`;
+  }
+  
+  if (material.leadTime) {
+    responseText += `Tedarik süresi: ${material.leadTime}\n`;
+  }
+  
+  if (material.unitPrice) {
+    responseText += `Birim fiyat: ₺${material.unitPrice}\n`;
+  }
+  
+  // Stok durumu değerlendirmesi
+  if (material.currentStock <= 0) {
+    responseText += '\nBu malzeme stokta bulunmuyor. Acilen sipariş edilmesi gerekiyor.';
+  } else if (material.currentStock < material.minLevel) {
+    responseText += '\nBu malzeme kritik stok seviyesinin altında. Sipariş edilmesi tavsiye edilir.';
+  } else {
+    responseText += '\nStok seviyesi yeterli.';
+  }
+  
+  const suggestions = [
+    `${material.code} için sipariş geçmişi`,
+    `${material.category || 'Bu kategori'} malzemelerini göster`,
+    'Benzer malzemeleri listele',
+    'Stok raporu oluştur'
+  ];
+  
+  return {
+    text: responseText,
+    timestamp: new Date(),
+    suggestions,
+    additionalData: {
+      type: 'materialDetail',
+      material
+    }
+  };
+};
+
+/**
+ * Üretim analizi getirir
+ * @returns {Promise<object>} Üretim analizi
+ */
+const getProductionAnalysis = async () => {
+  // TODO: Gerçek üretim analizi verisi
+  return {
+    period: 'Son 30 gün',
+    totalProduced: 58,
+    onTimeDelivery: 85, // Yüzde
+    averageDelayDays: 3.2,
+    topDelayReasons: [
+      { reason: 'Malzeme tedarikinde gecikme', count: 12, percentage: 42 },
+      { reason: 'Teknik sorunlar', count: 8, percentage: 28 },
+      { reason: 'Personel eksikliği', count: 5, percentage: 18 },
+      { reason: 'Diğer', count: 3, percentage: 12 }
+    ],
+    departmentPerformance: [
+      { name: 'Mekanik Üretim', efficiency: 92, issues: 3 },
+      { name: 'Elektrik Montaj', efficiency: 87, issues: 5 },
+      { name: 'Test', efficiency: 95, issues: 1 }
+    ],
+    improvementAreas: [
+      'Malzeme tedarik sürecinin optimizasyonu',
+      'Üretim planlama hassasiyetinin artırılması',
+      'Personel eğitimlerinin gözden geçirilmesi'
+    ]
+  };
+};
+
+/**
+ * Üretim analizi yanıtı oluşturur
+ * @param {object} analysis - Üretim analizi
+ * @returns {object} Oluşturulan yanıt
+ */
+const createProductionAnalysisResponse = (analysis) => {
+  if (!analysis) {
+    return {
+      text: 'Üretim analizi şu an için mevcut değil.',
+      timestamp: new Date(),
+      suggestions: [
+        'Üretim durumunu güncelle',
+        'Performans verilerini göster'
+      ]
+    };
+  }
+  
+  let responseText = `${analysis.period} için üretim analizi:\n\n`;
+  
+  responseText += `Toplam üretilen: ${analysis.totalProduced} adet\n`;
+  responseText += `Zamanında teslimat oranı: %${analysis.onTimeDelivery}\n`;
+  responseText += `Ortalama gecikme: ${analysis.averageDelayDays} gün\n\n`;
+  
+  if (analysis.topDelayReasons && analysis.topDelayReasons.length > 0) {
+    responseText += 'En sık karşılaşılan gecikme nedenleri:\n';
+    analysis.topDelayReasons.forEach(reason => {
+      responseText += `- ${reason.reason}: ${reason.count} kez (%${reason.percentage})\n`;
+    });
+    responseText += '\n';
+  }
+  
+  if (analysis.departmentPerformance && analysis.departmentPerformance.length > 0) {
+    responseText += 'Departman performansları:\n';
+    analysis.departmentPerformance.forEach(dept => {
+      responseText += `- ${dept.name}: Verimlilik %${dept.efficiency}, Sorun sayısı: ${dept.issues}\n`;
+    });
+    responseText += '\n';
+  }
+  
+  if (analysis.improvementAreas && analysis.improvementAreas.length > 0) {
+    responseText += 'İyileştirilmesi gereken alanlar:\n';
+    analysis.improvementAreas.forEach(area => {
+      responseText += `- ${area}\n`;
+    });
+  }
+  
+  const suggestions = [
+    'Daha detaylı analiz göster',
+    'Geçen ay ile karşılaştır',
+    'İyileştirme önerileri',
+    'Performans raporu oluştur'
+  ];
+  
+  return {
+    text: responseText,
+    timestamp: new Date(),
+    suggestions,
+    additionalData: {
+      type: 'productionAnalysis',
+      analysis
+    }
+  };
+};
+
+/**
+ * Üretim özeti getirir
+ * @returns {Promise<object>} Üretim özeti
+ */
+const getProductionSummary = async () => {
+  // TODO: Gerçek üretim özeti verisi
+  return {
+    activeOrders: 32,
+    completedLastWeek: 8,
+    delayedOrders: 5,
+    upcomingDeliveries: 12,
+    productionLoad: 85, // Yüzde
+    criticalOrders: [
+      { id: 'order-001', orderNo: '0424-1251', customer: 'AYEDAŞ', daysLeft: 2, progress: 65 },
+      { id: 'order-003', orderNo: '0424-1302', customer: 'MEDAŞ', daysLeft: 3, progress: 40 }
+    ],
+    nextDeliveries: [
+      { id: 'order-001', orderNo: '0424-1251', customer: 'AYEDAŞ', deliveryDate: '02.05.2025', cells: 1 },
+      { id: 'order-004', orderNo: '0424-1315', customer: 'GEDAŞ', deliveryDate: '05.05.2025', cells: 4 }
+    ]
+  };
+};
+
+/**
+ * Üretim özeti yanıtı oluşturur
+ * @param {object} summary - Üretim özeti
+ * @returns {object} Oluşturulan yanıt
+ */
+const createProductionSummaryResponse = (summary) => {
+  if (!summary) {
+    return {
+      text: 'Üretim özeti şu an için mevcut değil.',
+      timestamp: new Date(),
+      suggestions: [
+        'Üretim durumunu güncelle',
+        'Aktif siparişleri listele'
+      ]
+    };
+  }
+  
+  let responseText = 'Genel üretim durumu:\n\n';
+  
+  responseText += `Aktif siparişler: ${summary.activeOrders} adet\n`;
+  responseText += `Geçen hafta tamamlanan: ${summary.completedLastWeek} adet\n`;
+  responseText += `Geciken siparişler: ${summary.delayedOrders} adet\n`;
+  responseText += `Yaklaşan teslimatlar: ${summary.upcomingDeliveries} adet\n`;
+  responseText += `Üretim yükü: %${summary.productionLoad}\n\n`;
+  
+  if (summary.criticalOrders && summary.criticalOrders.length > 0) {
+    responseText += 'Kritik siparişler:\n';
+    summary.criticalOrders.forEach(order => {
+      responseText += `- ${order.orderNo} (${order.customer}): %${order.progress} tamamlandı, kalan süre ${order.daysLeft} gün\n`;
+    });
+    responseText += '\n';
+  }
+  
+  if (summary.nextDeliveries && summary.nextDeliveries.length > 0) {
+    responseText += 'Yaklaşan teslimatlar:\n';
+    summary.nextDeliveries.forEach(order => {
+      responseText += `- ${order.orderNo} (${order.customer}): ${order.deliveryDate}, ${order.cells} hücre\n`;
+    });
+  }
+  
+  const suggestions = [
+    'Günlük üretim planı',
+    'Geciken siparişleri göster',
+    'Kritik siparişlerin detayı',
+    'Üretim raporu oluştur'
+  ];
+  
+  return {
+    text: responseText,
+    timestamp: new Date(),
+    suggestions,
+    additionalData: {
+      type: 'productionSummary',
+      summary
+    }
+  };
+};
+
+// AI Servis nesnesi - AIChatbotButton.vue dosyası için gerekli
+const aiService = {
+  isConnected,
+  isProcessing,
+  currentMode,
+  currentLanguage,
+  supportedLanguages,
+  hasNewSuggestion,
+  learningMode,
+  chatHistory,
+  assistantInfo,
+  aiModes,
+  initialize,
+  initializeAI,
+  sendMessage,
+  setMode,
+  setLanguage,
+  clearChatHistory,
+  setLearningMode,
+  generateReport,
+  trainAI,
+  getLearningMode,
+  getCurrentMode,
+  getModes,
+  getChatHistory,
+  clearSuggestions
+};
+
 // Export edilecek API
 export {
   isConnected,
@@ -913,5 +1411,6 @@ export {
   getCurrentMode,
   getModes,
   getChatHistory,
-  clearSuggestions
+  clearSuggestions,
+  aiService
 };
