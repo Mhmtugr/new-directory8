@@ -1,4 +1,6 @@
+// Material servis modülü
 import { 
+  // Firebase helpers
   addDocument, 
   updateDocument, 
   getDocument, 
